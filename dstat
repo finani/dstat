@@ -2559,17 +2559,17 @@ def main():
     if op.output:
         if not os.path.exists(op.output):
             outputfile = open(op.output, 'w')
-            outputfile.write('"Dstat %s CSV output"\n' % VERSION)
-            header = ('"Author:","Dag Wieers <dag@wieers.com>"','','','','"URL:"','"http://dag.wieers.com/home-made/dstat/"\n')
-            outputfile.write(char['sep'].join(header))
+            # outputfile.write('"Dstat %s CSV output"\n' % VERSION)
+            # header = ('"Author:","Dag Wieers <dag@wieers.com>"','','','','"URL:"','"http://dag.wieers.com/home-made/dstat/"\n')
+            # outputfile.write(char['sep'].join(header))
         else:
             outputfile = open(op.output, 'a')
             outputfile.write('\n\n')
 
-        header = ('"Host:"','"%s"' % hostname,'','','','"User:"','"%s"\n' % user)
-        outputfile.write(char['sep'].join(header))
-        header = ('"Cmdline:"','"dstat %s"' % ' '.join(op.args),'','','','"Date:"','"%s"\n' % time.strftime('%d %b %Y %H:%M:%S %Z', time.localtime()))
-        outputfile.write(char['sep'].join(header))
+        # header = ('"Host:"','"%s"' % hostname,'','','','"User:"','"%s"\n' % user)
+        # outputfile.write(char['sep'].join(header))
+        # header = ('"Cmdline:"','"dstat %s"' % ' '.join(op.args),'','','','"Date:"','"%s"\n' % time.strftime('%d %b %Y %H:%M:%S %Z', time.localtime()))
+        # outputfile.write(char['sep'].join(header))
 
     ### Create pidfile
     if op.pidfile:
@@ -2672,7 +2672,16 @@ def main():
         die(8, 'None of the stats you selected are available.')
 
     if op.output:
-        outputfile.write(csvheader(totlist))
+        if op.debug == 1:
+            debug_header = ''
+            for idx in range(len(op.cpulist)):
+                debug_header += 'cpu' + str(idx) + '_usr,cpu' + str(idx) + '_sys,cpu' + str(idx) + '_idl,cpu' + str(idx) + '_wai,cpu' + str(idx) + '_stl,'
+            debug_header += 'disk_read,disk_write,net_recv,net_send,page_in,page_out,sys_int,sys_csw,epoch\n'
+            print(len(op.cpulist))
+            print(debug_header)
+            outputfile.write(debug_header)
+        else:
+            outputfile.write(csvheader(totlist))
 
     scheduler = sched.scheduler(time.time, time.sleep)
     inittime = time.time()
@@ -2808,16 +2817,19 @@ def perform(update):
         ### Print stats
         sys.stdout.write(line + theme['input'])
         if op.output and step == op.delay:
-            outputfile.write(oline + '\n')
+            outputfile.write(oline)
+            if op.debug == 1:
+                outputfile.write('\t%10.3f' % (starttime) + '\n')
 #            outputfile.flush()
 
         ### Print debugging output
         if op.debug:
-            totaltime = totaltime + (time.time() - starttime) * 1000.0
-            if loop == 0:
-                totaltime = totaltime * step
+            # totaltime = totaltime + (time.time() - starttime) * 1000.0
+            # if loop == 0:
+            #     totaltime = totaltime * step
             if op.debug == 1:
-                sys.stdout.write('%s%6.2fms%s' % (theme['roundtrip'], totaltime / step, theme['input']))
+                # sys.stdout.write('%s%6.2fms%s' % (theme['roundtrip'], totaltime / step, theme['input']))
+                sys.stdout.write(' %s%10.3f%s' % (theme['roundtrip'], starttime, theme['input']))
             elif op.debug == 2:
                 sys.stdout.write('%s%6.2f %s%d:%d%s' % (theme['roundtrip'], totaltime / step, theme['debug'], loop, step, theme['input']))
             elif op.debug > 2:
