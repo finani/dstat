@@ -18,6 +18,12 @@
 # pylint: disable=line-too-long,bad-continuation,broad-except,bare-except
 # pylint: disable=global-variable-undefined,global-at-module-level
 
+# How to Install
+# sudo apt install pcp
+
+# How to Run
+# dstat --epoch-adv --time-adv -C 0,1,2,3,4,5,total --nocolor --output time
+
 # Common imports
 from collections import OrderedDict
 try:
@@ -1163,7 +1169,7 @@ class DstatTool(object):
         elif plugin.name in ['time', 'time-adv']:    # formatted time
             value = stamp().strftime(TIMEFMT)
         if plugin.name in ['epoch-adv', 'time-adv']: # with milliseconds
-            value = value + '.' + str(stamp.value.tv_usec * 1000)[:3]
+            value = value + '.' + str(stamp.value.tv_usec * 1000).zfill(9)[:3]
         return value
 
     @staticmethod
@@ -1756,7 +1762,7 @@ class DstatTool(object):
                 newline = self.show_header(vislist)
                 newline += ANSI['reset'] + ANSI['clearline'] + ANSI['save']
         elif loop == 0:
-            sys.stdout.write('cpu log is saved in ' + self.output)
+            sys.stdout.write('cpu log is saved in ' + self.output + '\n')
 
         # Display CSV header
         newoline = ''
