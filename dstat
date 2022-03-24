@@ -24,7 +24,7 @@ try:
     import configparser as ConfigParser
 except ImportError:
     import ConfigParser
-import termios, struct, atexit, fcntl, sched, errno, time, re, sys, os
+import termios, struct, atexit, fcntl, sched, errno, time, re, sys, os, datetime
 
 # PCP Python PMAPI
 from pcp import pmapi, pmconfig
@@ -382,6 +382,23 @@ class DstatPlugin(object):
                 ret = ret + '"' + name + CHAR['colon'] + nick + '"'
         return ret
 
+    def csvheader(self):
+        ret = ''
+        if self.grouptype is None:
+            for i, nick in enumerate(self.names):
+                if i > 0:
+                    ret = ret + CHAR['sep']
+                ret = ret + '"' + nick + '"'
+            return ret
+        ilist = self.instlist()
+        for i, name in enumerate(ilist):
+            name = self.label.replace('%I', name)
+            for j, nick in enumerate(self.names):
+                if j > 0 or i > 0:
+                    ret = ret + CHAR['sep']
+                ret = ret + '"' + name + CHAR['underscore'] + nick + '"'
+        return ret
+
 
 class DstatTimePlugin(DstatPlugin):
     def __init__(self, name, label, width):
@@ -473,6 +490,7 @@ class DstatTool(object):
         self.show_conf = False
         self.header = 1
         self.output = False
+        self.mute_and_new_csv = False
         self.update = True
         self.pidfile = False
         self.float = False
@@ -920,7 +938,11 @@ class DstatTool(object):
         elif opt in ['noupdate']:
             self.update = False
         elif opt in ['o', 'output']:
-            self.output = arg
+            if arg == 'time':
+                self.output = datetime.datetime.now().strftime("%y%m%d_%H%M%S") + ".csv"
+                self.mute_and_new_csv = True
+            else:
+                self.output = arg
         elif opt in ['pidfile']:
             self.pidfile = arg
         elif opt in ['profile']:
@@ -1542,29 +1564,43 @@ class DstatTool(object):
     def show_csvheader(self, visible):
         "Return the header for CSV file"
         line = ''
-        ### CSV Header
-        if not os.path.exists(self.output):
-            line += '"pcp-dstat ' + self.context.pmGetConfig('PCP_VERSION') + ' CSV Output"\n'
-            line += '"Author:","PCP team <pcp@groups.io> and Dag Wieers <dag@wieers.com>",,,,"URL:","https://pcp.io/ and http://dag.wieers.com/home-made/dstat/"\n'
-        import getpass # pylint: disable=import-outside-toplevel
-        line += '"Host:","' + self.context.pmGetContextHostName() + '",,,,"User:","' + getpass.getuser() + '"\n'
-        line += '"Cmdline:","' + self.context.pmProgname() + ' ' + ' '.join(self.arguments) + '",,,,"Date:","' + time.strftime('%d %b %Y %H:%M:%S %Z') + '"\n'
-        ### Process title
-        for o in visible:
-            line += o.csvtitle()
-            if o is not visible[-1]:
-                line += CHAR['sep']
-            elif self.totlist != visible:
-                pass #line += THEME['title'] + CHAR['gt']
-        line += '\n'
-        ### Process subtitle
-        for o in visible:
-            line += o.csvsubtitle()
-            if o is not visible[-1]:
-                line += CHAR['sep']
-            elif self.totlist != visible:
-                pass #line += THEME['title'] + CHAR['gt']
-        return line + '\n'
+
+        if not self.mute_and_new_csv:
+            ### CSV Header
+            if not os.path.exists(self.output):
+                line += '"pcp-dstat ' + self.context.pmGetConfig('PCP_VERSION') + ' CSV Output"\n'
+                line += '"Author:","PCP team <pcp@groups.io> and Dag Wieers <dag@wieers.com>",,,,"URL:","https://pcp.io/ and http://dag.wieers.com/home-made/dstat/"\n'
+            import getpass # pylint: disable=import-outside-toplevel
+            line += '"Host:","' + self.context.pmGetContextHostName() + '",,,,"User:","' + getpass.getuser() + '"\n'
+            line += '"Cmdline:","' + self.context.pmProgname() + ' ' + ' '.join(self.arguments) + '",,,,"Date:","' + time.strftime('%d %b %Y %H:%M:%S %Z') + '"\n'
+
+            ### Process title
+            for o in visible:
+                line += o.csvtitle()
+                if o is not visible[-1]:
+                    line += CHAR['sep']
+                elif self.totlist != visible:
+                    pass #line += THEME['title'] + CHAR['gt']
+            line += '\n'
+
+            # ### Process subtitle
+            for o in visible:
+                line += o.csvsubtitle()
+                if o is not visible[-1]:
+                    line += CHAR['sep']
+                elif self.totlist != visible:
+                    pass #line += THEME['title'] + CHAR['gt']
+            return line + '\n'
+
+        else:
+            ### Process header
+            for o in visible:
+                line += o.csvheader()
+                if o is not visible[-1]:
+                    line += CHAR['sep']
+                elif self.totlist != visible:
+                    pass #line += THEME['title'] + CHAR['gt']
+            return line + '\n'
 
     @staticmethod
     def finalize():
@@ -1711,13 +1747,16 @@ class DstatTool(object):
                 newline = ANSI['restore']
 
         # Display header
-        if showheader:
-            if loop == 0 and self.totlist != vislist:
-                sys.stderr.write('Terminal width too small, trimming output.\n')
-            showheader = False
-            sys.stdout.write(newline)
-            newline = self.show_header(vislist)
-            newline += ANSI['reset'] + ANSI['clearline'] + ANSI['save']
+        if not self.mute_and_new_csv:
+            if showheader:
+                if loop == 0 and self.totlist != vislist:
+                    sys.stderr.write('Terminal width too small, trimming output.\n')
+                showheader = False
+                sys.stdout.write(newline)
+                newline = self.show_header(vislist)
+                newline += ANSI['reset'] + ANSI['clearline'] + ANSI['save']
+        elif loop == 0:
+            sys.stdout.write('cpu log is saved in ' + self.output)
 
         # Display CSV header
         newoline = ''
@@ -1738,7 +1777,8 @@ class DstatTool(object):
             oline = newoline + oline
 
         # Print stats
-        sys.stdout.write(line + THEME['input'])
+        if not self.mute_and_new_csv:
+            sys.stdout.write(line + THEME['input'])
 
         if self.output and step == self.delay:
             if not os.path.exists(self.output) or not os.path.isfile(op.output):
