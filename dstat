@@ -1760,7 +1760,7 @@ class DstatTool(object):
         if self.output and step == self.delay and self.novalues is False:
             outputfile.write('\n')
 
-    def execute(self):
+    def execute(self, steptime):
         """ Fetch and report """
         if self.debug:
             sys.stdout.write("Config file keywords: " + str(self.keys) + "\n")
@@ -1775,18 +1775,18 @@ class DstatTool(object):
         self.context.prepare_execute(self.opts, False, self.interpol, self.interval)
 
         update = 0.0
-        interval = 1.0
-        if not self.update:
-            interval = op.delay
+        updateCount = 0
+        interval = steptime
 
         while update <= self.delay * (self.samples - 1) or self.samples == -1:
             if self.context.type != PM_CONTEXT_ARCHIVE:
-                scheduler.enterabs(self.inittime + update, 1, perform, (update,))
+                scheduler.enterabs(self.inittime + update, 1, perform, (updateCount,))
                 scheduler.run()
             else:
                 self.perform(update)
             sys.stdout.flush()
             update = update + interval
+            updateCount = updateCount + 1
 
 
 def perform(update):
@@ -1798,7 +1798,7 @@ if __name__ == '__main__':
     global update
     try:
         dstat = DstatTool(sys.argv[1:])
-        dstat.execute()
+        dstat.execute(0.1)
     except pmapi.pmErr as error:
         if error.args[0] == PM_ERR_EOL:
             sys.exit(0)
