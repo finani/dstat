@@ -20,6 +20,8 @@
 
 # How to Install
 # sudo apt install pcp
+# sudo mv /usr/bin/dstat /usr/bin/dstat.old
+# sudo cp dstat /usr/bin/dstat
 
 # How to Run
 # dstat --epoch-adv --time-adv -C 0,1,2,3,4,5,total --nocolor --output time
