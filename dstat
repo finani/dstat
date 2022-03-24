@@ -24,6 +24,9 @@
 # How to Run
 # dstat --epoch-adv --time-adv -C 0,1,2,3,4,5,total --nocolor --output time
 
+# steptime = 1/hz
+steptime = 0.1
+
 # Common imports
 from collections import OrderedDict
 try:
@@ -1844,7 +1847,7 @@ if __name__ == '__main__':
     global update
     try:
         dstat = DstatTool(sys.argv[1:])
-        dstat.execute(0.1)
+        dstat.execute(steptime)
     except pmapi.pmErr as error:
         if error.args[0] == PM_ERR_EOL:
             sys.exit(0)
